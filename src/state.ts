@@ -122,13 +122,13 @@ let lock = Promise.resolve()
 export const getExtension = () => (window as {nostr?: any}).nostr
 
 export const withExtension = (f: (ext: any) => void) => {
-  lock = lock.catch(e => console.error(e)).then(() => f(getExtension()))
+  lock = lock.then(() => f(getExtension()))
 
   return lock
 }
 
 export const login = () => {
-  withExtension(async ext => {
+  return withExtension(async ext => {
     const pubkey = await ext.getPublicKey()
     const {relays, follows} = await loadPubkeyInfo(pubkey, defaultUrls)
 
