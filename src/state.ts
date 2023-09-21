@@ -110,7 +110,7 @@ export const loadPage = async () => {
 }
 
 export const loadPageIfNeeded = () => {
-  if (get(events).slice(get(cursor)).length < 10) {
+  if (get(events).slice(get(cursor)).length < 50) {
     loadPage()
   }
 }
