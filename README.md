@@ -1,1 +1,3 @@
-A proof-of-concept for linking QR codes with links via nostr.
+# Zephyr
+
+A calm place to read nostr.
