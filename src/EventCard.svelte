@@ -5,10 +5,27 @@
   export let event
 
   const link = path => `https://nostr.com/${path}`
+
   const formatter = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   })
+
+  const displayEntity = entity => {
+    entity = entity.replace('nostr:', '')
+
+    try {
+      const {type, data} = nip19.decode(entity)
+      const pubkey = data.pubkey || data
+      const person = people.get(pubkey)
+
+      if (person) {
+        return '@' + (person.name || person.display_name)
+      }
+    } catch(e) {}
+
+    return entity.slice(0, 24) + '...'
+  }
 
   $: person = people.get(event.pubkey)
   $: picture = `https://imgproxy.coracle.social/x/s:200:200/${btoa(person?.picture)}`
@@ -18,7 +35,9 @@
 </script>
 
 {#key event.id}
-  <div class="flex flex-col flex-grow gap-4 bg-white/80 p-4 rounded-2xl border-gray-500 border border-solid overflow-x-hidden">
+  <div
+    class="flex flex-col flex-grow gap-4 bg-white/80 p-4 rounded-2xl border-gray-500 border border-solid overflow-x-hidden"
+    style="box-shadow: 0px 0px 30px rgba(200, 200, 200, 0.5) inset;">
     {#if person}
       <a href={link(npub)} target="_blank" class="flex gap-4">
         <img class="rounded-full h-12 w-12 bg-gray-300" src={picture} alt="" />
@@ -28,10 +47,10 @@
         </div>
       </a>
     {/if}
-    <p class="note-content overflow-hidden text-ellipsis leading-6">
+    <p class="note-content overflow-x-hidden text-ellipsis leading-6">
       {#each content as part}
         {#if part.startsWith('nostr:')}
-          <a class="text-teal-500" href={link(part)} target="_blank">{part.slice(6, 24)}...</a>
+          <a class="text-teal-500" href={link(part)} target="_blank">{displayEntity(part)}</a>
         {:else if part.match(/https?:\/\/[^\s]+/)}
           <a class="text-teal-500" href={part} target="_blank">{part.replace(/^https?:\/\//, '')}</a>
         {:else if part.match(/\n+/)}

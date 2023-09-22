@@ -1,4 +1,5 @@
-import {sortBy} from 'ramda'
+import {nip19} from 'nostr-tools'
+import {sortBy, identity, uniq, uniqBy, prop} from 'ramda'
 import {batch} from 'hurdak'
 import * as t from 'svelte/transition'
 import {writable, get} from 'svelte/store'
@@ -59,21 +60,32 @@ export const loadPubkeyInfo = (pubkey, urls) => {
         if (!relays || !follows) {
           console.error("Failed to load user info")
         }
+
+        executor.target.cleanup()
       }
     })
   })
 }
 
-export const loadPeople = (urls, authors) => {
-  getExecutor(urls).load([{kinds: [0], authors}], {
-    onEvent: (url, e) => {
-      try {
-        people.set(e.pubkey, JSON.parse(e.content))
-      } catch (err) {
-        console.error(err)
+export const loadPeople = (urls, pubkeys) => {
+  const authors = pubkeys.filter(pk => !people.has(pk))
+
+  if (authors.length > 0) {
+    const executor = getExecutor(urls)
+
+    executor.load([{kinds: [0], authors}], {
+      onEvent: (url, e) => {
+        try {
+          people.set(e.pubkey, JSON.parse(e.content))
+        } catch (err) {
+          console.error(err)
+        }
+      },
+      onClose: () => {
+        executor.target.cleanup()
       }
-    },
-  })
+    })
+  }
 }
 
 export const getWindow = () => {
@@ -88,12 +100,24 @@ export const loadPage = async () => {
   const {follows, relays} = get(user)
   const filters = [{kinds: [1], limit: 500, authors: follows, until, since}]
 
-  const onEvent = batch(1000, chunk => {
+  const onEvent = batch(3000, chunk => {
     const filtered = chunk.filter(e => !e.tags.find(t => t[0] === "e") && e.content.length > 200)
+    const personMatches = uniq(chunk.flatMap(e => e.content.match(/nostr:n(pub|profile)\w+/) || []))
+    const pubkeys = personMatches.map(entity => {
+      try {
+        const {data} = nip19.decode(entity.slice(6))
+
+        return data.pubkey || data
+      } catch (e) {
+        return null
+      }
+    })
+
+    loadPeople(relays, pubkeys.filter(identity))
 
     events.update($events => {
       const $cursor = get(cursor)
-      const newEvents = [...$events, ...filtered]
+      const newEvents = uniqBy(prop('id'), [...$events, ...filtered])
 
       return [
         ...newEvents.slice(0, $cursor + 1),
@@ -102,10 +126,16 @@ export const loadPage = async () => {
     })
   })
 
-  getExecutor(relays).load(filters, {
+  const executor = getExecutor(relays)
+
+  executor.load(filters, {
     timeout: 5000,
-    onClose: loadPageIfNeeded,
     onEvent: (url, e) => onEvent(e),
+    onClose: () => {
+      loadPageIfNeeded()
+
+      executor.target.cleanup()
+    },
   })
 }
 
