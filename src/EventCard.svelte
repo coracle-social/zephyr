@@ -4,7 +4,7 @@
 
   export let event
 
-  const link = path => `https://nostr.com/${path}`
+  const link = path => `https://njump.me/${path.replace('nostr:', '')}`
 
   const formatter = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
